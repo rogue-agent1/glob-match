@@ -1,18 +1,12 @@
-# glob_match
+# glob-match
 
-Glob pattern matching — *, ?, **, character classes
+Glob Pattern Matcher. Zero-dependency, single-file Python CLI.
 
 ## Usage
 
 ```bash
 python3 glob_match.py --help
 ```
-
-## Features
-
-- Single file, zero dependencies
-- Python 3.8+ compatible
-- CLI interface
 
 ## License
 

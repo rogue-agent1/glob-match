@@ -1,50 +1,55 @@
 #!/usr/bin/env python3
-"""Glob pattern matching — *, ?, **, [chars], {alt1,alt2}."""
+"""Glob Match - Unix-style glob pattern matching with ** support."""
 import sys, os, re
 
 def glob_to_regex(pattern):
-    i, n, result = 0, len(pattern), ""
-    while i < n:
+    regex = "^"; i = 0
+    while i < len(pattern):
         c = pattern[i]
         if c == "*":
-            if i+1 < n and pattern[i+1] == "*":
-                result += ".*"; i += 2
-                if i < n and pattern[i] == "/": result += "/?"; i += 1
-            else: result += "[^/]*"
-        elif c == "?": result += "[^/]"
+            if i + 1 < len(pattern) and pattern[i+1] == "*":
+                regex += ".*"; i += 2
+                if i < len(pattern) and pattern[i] == "/": i += 1
+            else:
+                regex += "[^/]*"
+        elif c == "?": regex += "[^/]"
         elif c == "[":
             j = i + 1
-            while j < n and pattern[j] != "]": j += 1
-            result += "[" + pattern[i+1:j] + "]"; i = j
-        elif c == "{":
-            j = i + 1
-            while j < n and pattern[j] != "}": j += 1
-            alts = pattern[i+1:j].split(",")
-            result += "(" + "|".join(re.escape(a) for a in alts) + ")"; i = j
-        else: result += re.escape(c)
+            while j < len(pattern) and pattern[j] != "]": j += 1
+            regex += "[" + pattern[i+1:j] + "]"; i = j
+        elif c in ".+(){}|^$\\": regex += "\\" + c
+        else: regex += c
         i += 1
-    return "^" + result + "$"
+    return regex + "$"
 
-def match(pattern, text): return bool(re.match(glob_to_regex(pattern), text))
+def match(pattern, text):
+    return bool(re.match(glob_to_regex(pattern), text))
 
 def find(pattern, root="."):
     results = []
     for dirpath, dirs, files in os.walk(root):
         for f in files:
-            path = os.path.relpath(os.path.join(dirpath, f), root)
-            if match(pattern, path): results.append(path)
-    return results
+            path = os.path.join(dirpath, f)
+            rel = os.path.relpath(path, root)
+            if match(pattern, rel): results.append(rel)
+    return sorted(results)
 
-def cli():
-    if len(sys.argv) < 3:
-        print("Usage: glob_match <pattern> <text|--find [root]>"); sys.exit(1)
-    pat = sys.argv[1]
-    if sys.argv[2] == "--find":
-        root = sys.argv[3] if len(sys.argv)>3 else "."
-        for p in sorted(find(pat, root)): print(p)
+def main():
+    pattern = sys.argv[1] if len(sys.argv) > 1 else "*.py"
+    print(f"=== Glob Match ===\nPattern: {pattern}\n")
+    tests = ["main.py", "src/app.py", "test/test_main.py", "README.md", "lib/utils.js",
+             "src/components/Button.tsx", ".gitignore", "dist/bundle.min.js"]
+    if len(sys.argv) <= 2:
+        print("Regex:", glob_to_regex(pattern))
+        print("\nTest matches:")
+        for t in tests:
+            m = match(pattern, t)
+            print(f"  {'✓' if m else '✗'} {t}")
     else:
-        text = sys.argv[2]
-        print(f"Pattern: {pat}"); print(f"Text: {text}"); print(f"Match: {match(pat, text)}")
-        print(f"Regex: {glob_to_regex(pat)}")
+        root = sys.argv[2] if len(sys.argv) > 2 else "."
+        results = find(pattern, root)
+        print(f"Found {len(results)} match(es):")
+        for r in results[:20]: print(f"  {r}")
 
-if __name__ == "__main__": cli()
+if __name__ == "__main__":
+    main()
