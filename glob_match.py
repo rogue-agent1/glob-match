@@ -1,55 +1,67 @@
 #!/usr/bin/env python3
-"""Glob Match - Unix-style glob pattern matching with ** support."""
-import sys, os, re
+"""Glob pattern matching."""
 
-def glob_to_regex(pattern):
-    regex = "^"; i = 0
-    while i < len(pattern):
-        c = pattern[i]
-        if c == "*":
-            if i + 1 < len(pattern) and pattern[i+1] == "*":
-                regex += ".*"; i += 2
-                if i < len(pattern) and pattern[i] == "/": i += 1
+def glob_match(pattern: str, text: str) -> bool:
+    pi = ti = 0
+    star_pi = star_ti = -1
+    while ti < len(text):
+        if pi < len(pattern) and pattern[pi] == '*':
+            star_pi = pi; star_ti = ti; pi += 1
+        elif pi < len(pattern) and (pattern[pi] == '?' or pattern[pi] == text[ti]):
+            pi += 1; ti += 1
+        elif pi < len(pattern) and pattern[pi] == '[':
+            end = pattern.index(']', pi)
+            chars = pattern[pi+1:end]
+            negate = chars.startswith('!')
+            if negate: chars = chars[1:]
+            matched = False
+            i = 0
+            while i < len(chars):
+                if i + 2 < len(chars) and chars[i+1] == '-':
+                    if chars[i] <= text[ti] <= chars[i+2]: matched = True
+                    i += 3
+                else:
+                    if chars[i] == text[ti]: matched = True
+                    i += 1
+            if matched != negate:
+                pi = end + 1; ti += 1
+            elif star_pi >= 0:
+                pi = star_pi + 1; star_ti += 1; ti = star_ti
             else:
-                regex += "[^/]*"
-        elif c == "?": regex += "[^/]"
-        elif c == "[":
-            j = i + 1
-            while j < len(pattern) and pattern[j] != "]": j += 1
-            regex += "[" + pattern[i+1:j] + "]"; i = j
-        elif c in ".+(){}|^$\\": regex += "\\" + c
-        else: regex += c
-        i += 1
-    return regex + "$"
+                return False
+        elif star_pi >= 0:
+            pi = star_pi + 1; star_ti += 1; ti = star_ti
+        else:
+            return False
+    while pi < len(pattern) and pattern[pi] == '*':
+        pi += 1
+    return pi == len(pattern)
 
-def match(pattern, text):
-    return bool(re.match(glob_to_regex(pattern), text))
-
-def find(pattern, root="."):
-    results = []
-    for dirpath, dirs, files in os.walk(root):
-        for f in files:
-            path = os.path.join(dirpath, f)
-            rel = os.path.relpath(path, root)
-            if match(pattern, rel): results.append(rel)
-    return sorted(results)
-
-def main():
-    pattern = sys.argv[1] if len(sys.argv) > 1 else "*.py"
-    print(f"=== Glob Match ===\nPattern: {pattern}\n")
-    tests = ["main.py", "src/app.py", "test/test_main.py", "README.md", "lib/utils.js",
-             "src/components/Button.tsx", ".gitignore", "dist/bundle.min.js"]
-    if len(sys.argv) <= 2:
-        print("Regex:", glob_to_regex(pattern))
-        print("\nTest matches:")
-        for t in tests:
-            m = match(pattern, t)
-            print(f"  {'✓' if m else '✗'} {t}")
-    else:
-        root = sys.argv[2] if len(sys.argv) > 2 else "."
-        results = find(pattern, root)
-        print(f"Found {len(results)} match(es):")
-        for r in results[:20]: print(f"  {r}")
+def filter_glob(pattern: str, items: list) -> list:
+    return [item for item in items if glob_match(pattern, item)]
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv) < 3:
+        print("Usage: glob_match.py <pattern> <text>"); sys.exit(1)
+    print(glob_match(sys.argv[1], sys.argv[2]))
+
+def test():
+    assert glob_match("*.py", "test.py")
+    assert not glob_match("*.py", "test.js")
+    assert glob_match("test?", "test1")
+    assert not glob_match("test?", "test12")
+    assert glob_match("*", "anything")
+    assert glob_match("", "")
+    assert not glob_match("", "x")
+    assert glob_match("a*b*c", "aXXbYYc")
+    assert glob_match("[abc]", "b")
+    assert not glob_match("[abc]", "d")
+    assert glob_match("[a-z]", "m")
+    assert not glob_match("[a-z]", "5")
+    assert glob_match("[!0-9]", "a")
+    assert not glob_match("[!0-9]", "5")
+    # Filter
+    files = ["test.py", "main.py", "readme.md", "config.json"]
+    assert filter_glob("*.py", files) == ["test.py", "main.py"]
+    print("  glob_match: ALL TESTS PASSED")

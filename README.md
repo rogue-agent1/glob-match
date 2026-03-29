@@ -1,13 +1,17 @@
-# glob-match
+# glob_match
 
-Glob Pattern Matcher. Zero-dependency, single-file Python CLI.
+Glob pattern matching (*, ?, []) implementation
+
+Single-file, zero-dependency Python CLI tool.
 
 ## Usage
 
 ```bash
-python3 glob_match.py --help
+python glob_match.py --help
 ```
 
-## License
+## Test
 
-MIT
+```bash
+python -c "import glob_match; glob_match.test()"
+```
